@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shree Jagadamba Selection | Premium Fashion Catalogue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDK Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        let selectedCategory = 'All';
+        let user = null;
+
+        // Initialize App & Auth
+        async function initApp() {
+            try {
+                const userCredential = await signInAnonymously(auth);
+                user = userCredential.user;
+                if (user) {
+                    trackVisitor();
+                    loadProducts();
+                    loadVisitorCount();
+                }
+            } catch (error) {
+                console.error("Firebase Auth Error:", error);
+            }
+        }
+
+        // Track Visitors
+        async function trackVisitor() {
+            const visitorId = localStorage.getItem('sjs_visitor_id') || crypto.randomUUID();
+            if (!localStorage.getItem('sjs_visitor_id')) {
+                const visitorRef = collection(db, 'artifacts', appId, 'public', 'data', 'visitors');
+                await addDoc(visitorRef, { visitorId: visitorId, timestamp: serverTimestamp() });
+                localStorage.setItem('sjs_visitor_id', visitorId);
+            }
+        }
+
+        // Load Products
+        function loadProducts() {
+            const productRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+            onSnapshot(productRef, (snapshot) => {
+                const grid = document.getElementById('productGrid');
+                grid.innerHTML = '';
+                let count = 0;
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (selectedCategory === 'All' || data.category === selectedCategory) {
+                        const card = createProductCard(doc.id, data);
+                        grid.appendChild(card);
+                        count++;
+                    }
+                });
+                document.getElementById('itemCount').innerText = count;
+            });
+        }
+
+        // Visitor Count
+        function loadVisitorCount() {
+            const visitorRef = collection(db, 'artifacts', appId, 'public', 'data', 'visitors');
+            onSnapshot(visitorRef, (snapshot) => {
+                document.getElementById('visitorCountDisplay').innerText = snapshot.size;
+            });
+        }
+
+        function createProductCard(id, item) {
+            const div = document.createElement('div');
+            div.className = "product-card overflow-hidden group relative";
+            div.innerHTML = `
+                <button onclick="window.deleteItem('${id}')" class="delete-btn absolute top-2 right-2 z-10 bg-red-600 text-white w-8 h-8 rounded-full items-center justify-center shadow-lg hover:bg-red-700 transition">
+                    <i class="fas fa-trash-can text-sm"></i>
+                </button>
+                <div class="relative aspect-[4/5] bg-gray-50 overflow-hidden">
+                    <img src="${item.imageUrl}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                </div>
+                <div class="p-4 text-center border-t border-gray-50">
+                    <h4 class="font-bold text-gray-800 mb-1 truncate text-sm uppercase">${item.name}</h4>
+                    <p class="text-[9px] text-gray-400 uppercase tracking-widest mb-2 font-medium">${item.category}</p>
+                    <p class="text-lg font-bold text-[#b8860b]">₹${item.price}</p>
+                    <div class="mt-3 py-1 px-2 warning-tag rounded text-[8px] font-bold uppercase">In Store Only</div>
+                </div>
+            `;
+            return div;
+        }
+
+        // --- GLOBAL ACTIONS ---
+        window.addItem = async () => {
+            const name = document.getElementById('itemName').value;
+            const price = document.getElementById('itemPrice').value;
+            const category = document.getElementById('itemCategory').value;
+            const imageInput = document.getElementById('imageInput');
+
+            if (!name || !price || imageInput.files.length === 0) {
+                alert("Kripya saari details bharein."); return;
+            }
+
+            const reader = new FileReader();
+            reader.readAsDataURL(imageInput.files[0]);
+            reader.onload = async () => {
+                const productRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                await addDoc(productRef, { name, price, category, imageUrl: reader.result, timestamp: serverTimestamp() });
+                alert("Item add ho gaya!");
+                document.getElementById('itemName').value = '';
+                document.getElementById('itemPrice').value = '';
+            };
+        };
+
+        window.deleteItem = async (id) => {
+            if (confirm("Kya aap ise catalogue se hatana chahte hain?")) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', id);
+                await deleteDoc(docRef);
+            }
+        };
+
+        window.filterCategory = (cat, element) => {
+            selectedCategory = cat;
+            document.querySelectorAll('nav a').forEach(a => a.className = "text-gray-400 hover:text-[#b8860b] transition py-2");
+            element.className = "text-[#b8860b] border-b-2 border-[#b8860b] pb-1 py-2 font-bold";
+            loadProducts();
+        };
+
+        // NEW MODAL LOGIC
+        window.openAdminLogin = () => {
+            document.getElementById('loginModal').classList.remove('hidden');
+        };
+
+        window.closeAdminLogin = () => {
+            document.getElementById('loginModal').classList.add('hidden');
+        };
+
+        window.verifyAdmin = () => {
+            const pass = document.getElementById('adminPassword').value;
+            if (pass === "sirvitarun9828") {
+                document.getElementById('adminPanel').classList.remove('hidden');
+                document.body.classList.add('admin-active');
+                window.closeAdminLogin();
+                window.scrollTo({top:0, behavior:'smooth'});
+            } else {
+                alert("Galat password!");
+            }
+        };
+
+        window.logoutAdmin = () => {
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.body.classList.remove('admin-active');
+        };
+
+        initApp();
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;500;600&display=swap');
+        body { font-family: 'Poppins', sans-serif; background-color: #fffaf0; }
+        .brand-font { font-family: 'Playfair Display', serif; }
+        .logo-bg { background: radial-gradient(circle, #f9e498 0%, #f1c40f 100%); }
+        .product-card { transition: all 0.3s ease; background: white; border-radius: 15px; border: 1px solid #f3e5ab; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .warning-tag { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+        .delete-btn { display: none; }
+        body.admin-active .delete-btn { display: flex; }
+        .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
+    </style>
+</head>
+<body class="text-gray-900 overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="shadow-md">
+        <div class="logo-bg py-10 px-4 flex flex-col items-center text-center">
+            <div class="mb-4 bg-white/40 p-5 rounded-full backdrop-blur-md border border-white/50 shadow-xl">
+                <i class="fas fa-crown text-5xl text-[#b8860b]"></i>
+            </div>
+            <h1 class="brand-font text-4xl md:text-6xl text-[#5d4037] font-bold uppercase tracking-tighter">Shree Jagadamba</h1>
+            <p class="brand-font text-xl md:text-3xl text-[#8d6e63] tracking-[0.4em] font-semibold mt-1">SELECTION</p>
+            <div class="mt-4 h-1.5 w-32 bg-[#b8860b] mx-auto rounded-full"></div>
+            <p class="text-xs mt-5 text-[#5d4037] font-black tracking-[0.2em] uppercase italic text-center">Anavatti, Shivamogga</p>
+        </div>
+        
+        <nav class="bg-white border-b overflow-x-auto no-scrollbar whitespace-nowrap sticky top-0 z-40">
+            <div class="flex justify-center space-x-10 py-4 px-6 text-[11px] font-bold uppercase tracking-widest">
+                <a href="javascript:void(0)" onclick="filterCategory('All', this)" class="text-[#b8860b] border-b-2 border-[#b8860b] pb-1">All Items</a>
+                <a href="javascript:void(0)" onclick="filterCategory('Saree', this)" class="text-gray-400 hover:text-[#b8860b] transition">Sarees</a>
+                <a href="javascript:void(0)" onclick="filterCategory('Kurti', this)" class="text-gray-400 hover:text-[#b8860b] transition">Kurtis</a>
+                <a href="javascript:void(0)" onclick="filterCategory('Kids Wear', this)" class="text-gray-400 hover:text-[#b8860b] transition">Kids Wear</a>
+                <a href="javascript:void(0)" onclick="filterCategory('Mens Wear', this)" class="text-gray-400 hover:text-[#b8860b] transition">Mens Wear</a>
+                <a href="javascript:void(0)" onclick="filterCategory('Other', this)" class="text-gray-400 hover:text-[#b8860b] transition">Other</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Admin Panel (Only visible after login) -->
+    <section id="adminPanel" class="hidden max-w-6xl mx-auto mt-8 p-8 bg-yellow-50 rounded-[2rem] border-2 border-dashed border-[#d4af37] mx-4 lg:mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+            <div class="flex items-center gap-4 text-center md:text-left">
+                <div class="bg-white p-3 rounded-2xl shadow-md text-[#b8860b]"><i class="fas fa-user-shield text-2xl"></i></div>
+                <div>
+                    <h2 class="font-bold text-xl leading-tight text-gray-800 uppercase">Owner Dashboard</h2>
+                    <p class="text-[10px] text-green-600 font-bold uppercase tracking-widest">Admin Control Active</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-8">
+                <div class="text-center bg-white px-6 py-3 rounded-2xl shadow-sm border border-yellow-200">
+                    <p class="text-[9px] uppercase font-black text-gray-400">Total Visitors</p>
+                    <p id="visitorCountDisplay" class="text-2xl font-black text-gray-800">0</p>
+                </div>
+                <button onclick="logoutAdmin()" class="bg-white text-red-500 w-10 h-10 rounded-full shadow-lg hover:bg-red-50 flex items-center justify-center">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <input type="file" id="imageInput" class="hidden" accept="image/*" onchange="if(this.files.length) document.getElementById('fileLabel').innerText='Photo Ready'">
+            <label for="imageInput" id="fileLabel" class="flex items-center justify-center border-2 border-white rounded-2xl p-4 cursor-pointer bg-white text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center shadow-sm">
+                Select Photo
+            </label>
+            <input type="text" id="itemName" placeholder="Item Name" class="bg-white border-none p-4 rounded-2xl text-sm shadow-sm outline-none">
+            <input type="text" id="itemPrice" placeholder="Price (₹)" class="bg-white border-none p-4 rounded-xl text-sm shadow-sm outline-none">
+            <select id="itemCategory" class="bg-white border-none p-4 rounded-2xl text-sm shadow-sm outline-none font-bold text-gray-600">
+                <option value="Saree">Saree</option>
+                <option value="Kurti">Kurti</option>
+                <option value="Kids Wear">Kids Wear</option>
+                <option value="Mens Wear">Mens Wear</option>
+                <option value="Other">Other</option>
+            </select>
+            <button onclick="addItem()" class="bg-[#d4af37] text-white font-black py-4 rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-[#b8860b] transition">
+                Upload Stock
+            </button>
+        </div>
+    </section>
+
+    <!-- Catalogue -->
+    <main class="max-w-7xl mx-auto px-4 py-16">
+        <div class="text-center mb-12">
+            <h3 class="brand-font text-3xl md:text-4xl text-gray-800 tracking-wide uppercase font-bold text-center">Latest Collections</h3>
+            <p class="text-[10px] text-red-500 font-bold uppercase tracking-[0.3em] mt-3 italic text-center">
+                ⚠️ Store Visit Only • <span id="itemCount">0</span> Items Online
+            </p>
+        </div>
+        <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10"></div>
+    </main>
+
+    <!-- Info -->
+    <section class="max-w-7xl mx-auto px-4 py-16 border-t border-[#f3e5ab]">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center bg-white p-10 md:p-16 rounded-[3rem] shadow-sm border border-gray-100">
+            <div>
+                <h3 class="brand-font text-4xl mb-6 uppercase font-bold text-gray-800">Showroom Info</h3>
+                <p class="text-gray-500 text-sm mb-8 font-medium italic">Explore our premium collection online. Please note that we are a physical-only showroom and do not offer online deliveries.</p>
+                <div class="flex items-center gap-4 text-gray-700 font-bold bg-[#fffaf0] p-5 rounded-2xl border border-[#f3e5ab] w-fit">
+                    <i class="fas fa-clock text-[#b8860b] text-2xl"></i>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] uppercase text-gray-400 tracking-widest">Opening Hours</span>
+                        <span class="tracking-widest uppercase text-sm">10:00 AM – 9:00 PM</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-red-50 border border-red-100 p-10 rounded-3xl">
+                <h4 class="text-red-600 font-black text-xs uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
+                    <i class="fas fa-exclamation-triangle"></i> Official Notice
+                </h4>
+                <p class="text-[12px] text-red-500 leading-relaxed font-bold text-center">
+                    This website serves as a digital display catalogue. No online orders are processed here. Kindly visit our showroom in Anavatti, Shivamogga.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white py-16 text-center border-t border-[#f3e5ab]">
+        <div class="brand-font text-2xl text-[#b8860b] mb-2 tracking-widest font-black uppercase text-center">Shree Jagadamba Selection</div>
+        <p class="text-[10px] text-gray-400 uppercase tracking-[0.4em] mb-12 font-black text-center">Anavatti, Shivamogga</p>
+        <div class="flex flex-col items-center gap-8">
+            <p class="text-[9px] text-gray-300 uppercase tracking-widest italic text-center">© 2026. This is a digital catalogue only. All rights reserved.</p>
+            <button onclick="openAdminLogin()" class="flex items-center gap-3 text-[11px] text-gray-400 hover:text-[#b8860b] border border-gray-100 px-8 py-3 rounded-full transition-all font-black uppercase tracking-[0.2em]">
+                <i class="fas fa-lock"></i> Owner Login
+            </button>
+        </div>
+    </footer>
+
+    <!-- LOGIN MODAL -->
+    <div id="loginModal" class="hidden fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-[#fffaf0] text-[#b8860b] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#f3e5ab]">
+                    <i class="fas fa-user-lock text-2xl"></i>
+                </div>
+                <h2 class="brand-font text-xl font-bold uppercase tracking-wider text-center">Owner Access</h2>
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-1 text-center font-bold">Manage Catalogue</p>
+            </div>
+            <div class="space-y-4">
+                <input type="password" id="adminPassword" placeholder="Enter Password" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-center font-bold tracking-widest outline-none focus:border-[#b8860b]">
+                <div class="flex gap-2">
+                    <button onclick="closeAdminLogin()" class="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-gray-600 uppercase">Cancel</button>
+                    <button onclick="verifyAdmin()" class="flex-[2] py-4 bg-[#d4af37] text-white rounded-xl text-xs font-bold shadow-lg uppercase tracking-widest">Verify</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
