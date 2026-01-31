@@ -1,312 +1,519 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shree Jagadamba Selection | Premium Fashion Catalogue</title>
+    <title>SJS Showroom | Professional Catalogue</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Firebase SDK Setup -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, onSnapshot, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Configuration
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        let selectedCategory = 'All';
-        let user = null;
-
-        // Initialize App & Auth
-        async function initApp() {
-            try {
-                const userCredential = await signInAnonymously(auth);
-                user = userCredential.user;
-                if (user) {
-                    trackVisitor();
-                    loadProducts();
-                    loadVisitorCount();
-                }
-            } catch (error) {
-                console.error("Firebase Auth Error:", error);
-            }
-        }
-
-        // Track Visitors
-        async function trackVisitor() {
-            const visitorId = localStorage.getItem('sjs_visitor_id') || crypto.randomUUID();
-            if (!localStorage.getItem('sjs_visitor_id')) {
-                const visitorRef = collection(db, 'artifacts', appId, 'public', 'data', 'visitors');
-                await addDoc(visitorRef, { visitorId: visitorId, timestamp: serverTimestamp() });
-                localStorage.setItem('sjs_visitor_id', visitorId);
-            }
-        }
-
-        // Load Products
-        function loadProducts() {
-            const productRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-            onSnapshot(productRef, (snapshot) => {
-                const grid = document.getElementById('productGrid');
-                grid.innerHTML = '';
-                let count = 0;
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (selectedCategory === 'All' || data.category === selectedCategory) {
-                        const card = createProductCard(doc.id, data);
-                        grid.appendChild(card);
-                        count++;
-                    }
-                });
-                document.getElementById('itemCount').innerText = count;
-            });
-        }
-
-        // Visitor Count
-        function loadVisitorCount() {
-            const visitorRef = collection(db, 'artifacts', appId, 'public', 'data', 'visitors');
-            onSnapshot(visitorRef, (snapshot) => {
-                document.getElementById('visitorCountDisplay').innerText = snapshot.size;
-            });
-        }
-
-        function createProductCard(id, item) {
-            const div = document.createElement('div');
-            div.className = "product-card overflow-hidden group relative";
-            div.innerHTML = `
-                <button onclick="window.deleteItem('${id}')" class="delete-btn absolute top-2 right-2 z-10 bg-red-600 text-white w-8 h-8 rounded-full items-center justify-center shadow-lg hover:bg-red-700 transition">
-                    <i class="fas fa-trash-can text-sm"></i>
-                </button>
-                <div class="relative aspect-[4/5] bg-gray-50 overflow-hidden">
-                    <img src="${item.imageUrl}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
-                </div>
-                <div class="p-4 text-center border-t border-gray-50">
-                    <h4 class="font-bold text-gray-800 mb-1 truncate text-sm uppercase">${item.name}</h4>
-                    <p class="text-[9px] text-gray-400 uppercase tracking-widest mb-2 font-medium">${item.category}</p>
-                    <p class="text-lg font-bold text-[#b8860b]">₹${item.price}</p>
-                    <div class="mt-3 py-1 px-2 warning-tag rounded text-[8px] font-bold uppercase">In Store Only</div>
-                </div>
-            `;
-            return div;
-        }
-
-        // --- GLOBAL ACTIONS ---
-        window.addItem = async () => {
-            const name = document.getElementById('itemName').value;
-            const price = document.getElementById('itemPrice').value;
-            const category = document.getElementById('itemCategory').value;
-            const imageInput = document.getElementById('imageInput');
-
-            if (!name || !price || imageInput.files.length === 0) {
-                alert("Kripya saari details bharein."); return;
-            }
-
-            const reader = new FileReader();
-            reader.readAsDataURL(imageInput.files[0]);
-            reader.onload = async () => {
-                const productRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-                await addDoc(productRef, { name, price, category, imageUrl: reader.result, timestamp: serverTimestamp() });
-                alert("Item add ho gaya!");
-                document.getElementById('itemName').value = '';
-                document.getElementById('itemPrice').value = '';
-            };
-        };
-
-        window.deleteItem = async (id) => {
-            if (confirm("Kya aap ise catalogue se hatana chahte hain?")) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', id);
-                await deleteDoc(docRef);
-            }
-        };
-
-        window.filterCategory = (cat, element) => {
-            selectedCategory = cat;
-            document.querySelectorAll('nav a').forEach(a => a.className = "text-gray-400 hover:text-[#b8860b] transition py-2");
-            element.className = "text-[#b8860b] border-b-2 border-[#b8860b] pb-1 py-2 font-bold";
-            loadProducts();
-        };
-
-        // NEW MODAL LOGIC
-        window.openAdminLogin = () => {
-            document.getElementById('loginModal').classList.remove('hidden');
-        };
-
-        window.closeAdminLogin = () => {
-            document.getElementById('loginModal').classList.add('hidden');
-        };
-
-        window.verifyAdmin = () => {
-            const pass = document.getElementById('adminPassword').value;
-            if (pass === "sirvitarun9828") {
-                document.getElementById('adminPanel').classList.remove('hidden');
-                document.body.classList.add('admin-active');
-                window.closeAdminLogin();
-                window.scrollTo({top:0, behavior:'smooth'});
-            } else {
-                alert("Galat password!");
-            }
-        };
-
-        window.logoutAdmin = () => {
-            document.getElementById('adminPanel').classList.add('hidden');
-            document.body.classList.remove('admin-active');
-        };
-
-        initApp();
-    </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;500;600&display=swap');
-        body { font-family: 'Poppins', sans-serif; background-color: #fffaf0; }
+        :root { --gold: #B8860B; --cream: #FFFAF0; --dark: #2D2424; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--cream); color: var(--dark); margin: 0; scroll-behavior: smooth; }
         .brand-font { font-family: 'Playfair Display', serif; }
-        .logo-bg { background: radial-gradient(circle, #f9e498 0%, #f1c40f 100%); }
-        .product-card { transition: all 0.3s ease; background: white; border-radius: 15px; border: 1px solid #f3e5ab; }
+        .hero-gradient { background: linear-gradient(135deg, #ffffff 0%, #f3e5ab 100%); }
+        
+        .product-card { 
+            background: white; border-radius: 1.5rem; border: 1px solid rgba(184,134,11,0.1); 
+            overflow: hidden; position: relative; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); cursor: pointer;
+        }
+        .product-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1); }
+        
+        .nav-active { color: var(--gold); border-bottom: 3px solid var(--gold); font-weight: 700; }
+        .modal-overlay { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999; }
+        
+        .admin-only { display: none !important; }
+        body.admin-active .admin-only { display: block !important; }
+        
+        .delete-btn { 
+            display: none !important; position: absolute; top: 12px; left: 12px; z-index: 50; 
+            background: #ef4444; color: white; width: 35px; height: 35px; 
+            border-radius: 50%; align-items: center; justify-content: center; 
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); border: 2px solid white;
+            transition: 0.3s;
+        }
+        .delete-btn:hover { transform: scale(1.15); background: #b91c1c; }
+        body.admin-active .delete-btn { display: flex !important; }
+
+        .action-btn {
+            width: 38px; height: 38px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px);
+            transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .action-btn:active { transform: scale(0.9); }
+
+        .like-active { color: #ef4444; } /* Red Heart */
+        .like-inactive { color: #cbd5e1; } /* Gray Heart */
+
+        .loader-spin { border: 3px solid #f3f3f3; border-top: 3px solid var(--gold); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .custom-alert { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 14px 28px; border-radius: 1rem; color: white; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: 0.4s; opacity: 0; pointer-events: none; text-align: center; }
+        .custom-alert.show { opacity: 1; pointer-events: auto; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .warning-tag { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
-        .delete-btn { display: none; }
-        body.admin-active .delete-btn { display: flex; }
-        .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
     </style>
 </head>
-<body class="text-gray-900 overflow-x-hidden">
+<body class="overflow-x-hidden">
 
-    <!-- Header -->
-    <header class="shadow-md">
-        <div class="logo-bg py-10 px-4 flex flex-col items-center text-center">
-            <div class="mb-4 bg-white/40 p-5 rounded-full backdrop-blur-md border border-white/50 shadow-xl">
-                <i class="fas fa-crown text-5xl text-[#b8860b]"></i>
+    <div id="toast" class="custom-alert bg-gray-900"></div>
+
+    <header class="hero-gradient shadow-sm border-b border-yellow-100">
+        <div class="max-w-7xl mx-auto px-6 py-10 flex flex-col items-center text-center">
+            <div class="mb-4 p-6 bg-white rounded-full shadow-2xl inline-block border-2 border-yellow-50 relative">
+                <i class="fas fa-crown text-6xl text-[#B8860B]"></i>
             </div>
-            <h1 class="brand-font text-4xl md:text-6xl text-[#5d4037] font-bold uppercase tracking-tighter">Shree Jagadamba</h1>
-            <p class="brand-font text-xl md:text-3xl text-[#8d6e63] tracking-[0.4em] font-semibold mt-1">SELECTION</p>
-            <div class="mt-4 h-1.5 w-32 bg-[#b8860b] mx-auto rounded-full"></div>
-            <p class="text-xs mt-5 text-[#5d4037] font-black tracking-[0.2em] uppercase italic text-center">Anavatti, Shivamogga</p>
+            <h1 class="brand-font text-4xl md:text-5xl text-gray-800 font-bold uppercase tracking-tighter">Shree Jagadamba</h1>
+            <p class="brand-font text-xl md:text-2xl text-[#B8860B] tracking-[0.5em] font-semibold mt-1 uppercase">Selection</p>
+            <p class="text-[10px] mt-4 text-gray-400 font-bold uppercase tracking-widest italic text-center">Anavatti, Shivamogga • Karnataka</p>
         </div>
         
-        <nav class="bg-white border-b overflow-x-auto no-scrollbar whitespace-nowrap sticky top-0 z-40">
-            <div class="flex justify-center space-x-10 py-4 px-6 text-[11px] font-bold uppercase tracking-widest">
-                <a href="javascript:void(0)" onclick="filterCategory('All', this)" class="text-[#b8860b] border-b-2 border-[#b8860b] pb-1">All Items</a>
-                <a href="javascript:void(0)" onclick="filterCategory('Saree', this)" class="text-gray-400 hover:text-[#b8860b] transition">Sarees</a>
-                <a href="javascript:void(0)" onclick="filterCategory('Kurti', this)" class="text-gray-400 hover:text-[#b8860b] transition">Kurtis</a>
-                <a href="javascript:void(0)" onclick="filterCategory('Kids Wear', this)" class="text-gray-400 hover:text-[#b8860b] transition">Kids Wear</a>
-                <a href="javascript:void(0)" onclick="filterCategory('Mens Wear', this)" class="text-gray-400 hover:text-[#b8860b] transition">Mens Wear</a>
-                <a href="javascript:void(0)" onclick="filterCategory('Other', this)" class="text-gray-400 hover:text-[#b8860b] transition">Other</a>
+        <nav class="bg-white/95 sticky top-0 z-50 border-b border-gray-100 overflow-x-auto no-scrollbar shadow-sm">
+            <div class="max-w-7xl mx-auto flex justify-center space-x-6 md:space-x-8 py-5 px-6 whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.15em]">
+                <a id="cat-All" href="javascript:void(0)" onclick="window.filterCategory('All', this)" class="nav-active py-1">All</a>
+                <a id="cat-Saree" href="javascript:void(0)" onclick="window.filterCategory('Saree', this)" class="text-gray-400 py-1">Sarees</a>
+                <a id="cat-Kurti" href="javascript:void(0)" onclick="window.filterCategory('Kurti', this)" class="text-gray-400 py-1">Kurtis</a>
+                <a id="cat-Mens" href="javascript:void(0)" onclick="window.filterCategory('Mens Wear', this)" class="text-gray-400 py-1">Mens</a>
+                <!-- New Liked Tab -->
+                <a id="cat-Liked" href="javascript:void(0)" onclick="window.filterCategory('Liked', this)" class="text-red-500 py-1 flex items-center gap-2">
+                    <i class="fas fa-heart"></i> Saved
+                </a>
             </div>
         </nav>
     </header>
 
-    <!-- Admin Panel (Only visible after login) -->
-    <section id="adminPanel" class="hidden max-w-6xl mx-auto mt-8 p-8 bg-yellow-50 rounded-[2rem] border-2 border-dashed border-[#d4af37] mx-4 lg:mx-auto">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
-            <div class="flex items-center gap-4 text-center md:text-left">
-                <div class="bg-white p-3 rounded-2xl shadow-md text-[#b8860b]"><i class="fas fa-user-shield text-2xl"></i></div>
-                <div>
-                    <h2 class="font-bold text-xl leading-tight text-gray-800 uppercase">Owner Dashboard</h2>
-                    <p class="text-[10px] text-green-600 font-bold uppercase tracking-widest">Admin Control Active</p>
-                </div>
+    <div class="bg-red-600 py-3 text-center shadow-lg relative z-20">
+        <p class="text-[10px] md:text-xs text-white font-black uppercase tracking-[0.2em]">
+            ⚠️ VISIT OUR STORE TO PURCHASE • NO ONLINE DELIVERY
+        </p>
+    </div>
+
+    <!-- Owner Dashboard -->
+    <section id="adminPanel" class="admin-only max-w-6xl mx-auto mt-8 p-8 bg-white rounded-[2.5rem] shadow-2xl border-2 border-yellow-400 mx-4 lg:mx-auto">
+        <div class="flex justify-between items-center mb-8 border-b pb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-yellow-50 rounded-xl flex items-center justify-center text-[#B8860B] shadow-inner"><i class="fas fa-magic text-xl"></i></div>
+                <h2 class="brand-font text-2xl font-bold text-gray-800 uppercase">Dukaan Dashboard</h2>
             </div>
-            <div class="flex items-center gap-8">
-                <div class="text-center bg-white px-6 py-3 rounded-2xl shadow-sm border border-yellow-200">
-                    <p class="text-[9px] uppercase font-black text-gray-400">Total Visitors</p>
-                    <p id="visitorCountDisplay" class="text-2xl font-black text-gray-800">0</p>
-                </div>
-                <button onclick="logoutAdmin()" class="bg-white text-red-500 w-10 h-10 rounded-full shadow-lg hover:bg-red-50 flex items-center justify-center">
-                    <i class="fas fa-times"></i>
-                </button>
+            <button onclick="window.logoutManual()" class="text-red-500 font-bold text-[10px] uppercase tracking-widest border border-red-100 px-4 py-2 rounded-lg hover:bg-red-50">Logout</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="md:col-span-1">
+                <input type="file" id="imgInp" class="hidden" accept="image/*" onchange="window.handleFileSelect(this)">
+                <label for="imgInp" id="lTag" class="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-6 cursor-pointer bg-gray-50 text-[10px] font-bold text-gray-400 uppercase text-center h-full min-h-[120px] hover:bg-yellow-50 transition-all">
+                    <i class="fas fa-camera text-3xl mb-2 text-yellow-600"></i>
+                    <span>Photo Chuno</span>
+                </label>
             </div>
+            <div class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" id="itemName" placeholder="Saree/Kurti Ka Naam" class="w-full bg-gray-50 border p-4 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 font-medium">
+                <input type="number" id="itemPrice" placeholder="Price (₹)" class="w-full bg-gray-50 border p-4 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 font-bold text-yellow-700">
+                <select id="itemCat" class="w-full bg-gray-50 border p-4 rounded-xl text-sm font-bold text-gray-600 outline-none">
+                    <option value="Saree">Saree</option>
+                    <option value="Kurti">Kurti</option>
+                    <option value="Mens Wear">Mens Wear</option>
+                    <option value="Other">Other</option>
+                </select>
+                <button id="uploadBtn" onclick="window.addItem()" class="w-full bg-[#B8860B] hover:bg-black text-white font-bold rounded-xl uppercase text-xs shadow-lg active:scale-95 transition-all py-4">Upload Karein</button>
+            </div>
+        </div>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-4 py-16">
+        <div id="loadingStatus" class="flex flex-col items-center justify-center py-24 text-gray-400 text-center">
+            <div class="loader-spin mb-4"></div><p id="loadingMsg" class="text-[11px] uppercase tracking-widest text-gray-600">Connecting to SJS Database...</p>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <input type="file" id="imageInput" class="hidden" accept="image/*" onchange="if(this.files.length) document.getElementById('fileLabel').innerText='Photo Ready'">
-            <label for="imageInput" id="fileLabel" class="flex items-center justify-center border-2 border-white rounded-2xl p-4 cursor-pointer bg-white text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center shadow-sm">
-                Select Photo
-            </label>
-            <input type="text" id="itemName" placeholder="Item Name" class="bg-white border-none p-4 rounded-2xl text-sm shadow-sm outline-none">
-            <input type="text" id="itemPrice" placeholder="Price (₹)" class="bg-white border-none p-4 rounded-xl text-sm shadow-sm outline-none">
-            <select id="itemCategory" class="bg-white border-none p-4 rounded-2xl text-sm shadow-sm outline-none font-bold text-gray-600">
-                <option value="Saree">Saree</option>
-                <option value="Kurti">Kurti</option>
-                <option value="Kids Wear">Kids Wear</option>
-                <option value="Mens Wear">Mens Wear</option>
-                <option value="Other">Other</option>
-            </select>
-            <button onclick="addItem()" class="bg-[#d4af37] text-white font-black py-4 rounded-2xl shadow-xl uppercase text-xs tracking-widest hover:bg-[#b8860b] transition">
-                Upload Stock
-            </button>
+        <!-- Product Grid -->
+        <div id="pGrid" class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10"></div>
+        
+        <div id="noData" class="hidden flex flex-col items-center justify-center py-20 text-gray-300">
+            <i class="fas fa-heart-broken text-5xl mb-4"></i>
+            <p id="noDataText" class="text-xs uppercase font-bold tracking-widest">Abhi Stock Khali Hai</p>
         </div>
-    </section>
-
-    <!-- Catalogue -->
-    <main class="max-w-7xl mx-auto px-4 py-16">
-        <div class="text-center mb-12">
-            <h3 class="brand-font text-3xl md:text-4xl text-gray-800 tracking-wide uppercase font-bold text-center">Latest Collections</h3>
-            <p class="text-[10px] text-red-500 font-bold uppercase tracking-[0.3em] mt-3 italic text-center">
-                ⚠️ Store Visit Only • <span id="itemCount">0</span> Items Online
-            </p>
-        </div>
-        <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10"></div>
     </main>
 
-    <!-- Info -->
-    <section class="max-w-7xl mx-auto px-4 py-16 border-t border-[#f3e5ab]">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center bg-white p-10 md:p-16 rounded-[3rem] shadow-sm border border-gray-100">
-            <div>
-                <h3 class="brand-font text-4xl mb-6 uppercase font-bold text-gray-800">Showroom Info</h3>
-                <p class="text-gray-500 text-sm mb-8 font-medium italic">Explore our premium collection online. Please note that we are a physical-only showroom and do not offer online deliveries.</p>
-                <div class="flex items-center gap-4 text-gray-700 font-bold bg-[#fffaf0] p-5 rounded-2xl border border-[#f3e5ab] w-fit">
-                    <i class="fas fa-clock text-[#b8860b] text-2xl"></i>
-                    <div class="flex flex-col">
-                        <span class="text-[10px] uppercase text-gray-400 tracking-widest">Opening Hours</span>
-                        <span class="tracking-widest uppercase text-sm">10:00 AM – 9:00 PM</span>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-red-50 border border-red-100 p-10 rounded-3xl">
-                <h4 class="text-red-600 font-black text-xs uppercase tracking-[0.3em] mb-4 flex items-center gap-3">
-                    <i class="fas fa-exclamation-triangle"></i> Official Notice
-                </h4>
-                <p class="text-[12px] text-red-500 leading-relaxed font-bold text-center">
-                    This website serves as a digital display catalogue. No online orders are processed here. Kindly visit our showroom in Anavatti, Shivamogga.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-white py-16 text-center border-t border-[#f3e5ab]">
-        <div class="brand-font text-2xl text-[#b8860b] mb-2 tracking-widest font-black uppercase text-center">Shree Jagadamba Selection</div>
-        <p class="text-[10px] text-gray-400 uppercase tracking-[0.4em] mb-12 font-black text-center">Anavatti, Shivamogga</p>
-        <div class="flex flex-col items-center gap-8">
-            <p class="text-[9px] text-gray-300 uppercase tracking-widest italic text-center">© 2026. This is a digital catalogue only. All rights reserved.</p>
-            <button onclick="openAdminLogin()" class="flex items-center gap-3 text-[11px] text-gray-400 hover:text-[#b8860b] border border-gray-100 px-8 py-3 rounded-full transition-all font-black uppercase tracking-[0.2em]">
-                <i class="fas fa-lock"></i> Owner Login
-            </button>
-        </div>
+    <footer class="py-16 text-center border-t border-yellow-50 bg-white">
+        <p class="brand-font text-2xl font-bold text-gray-800 mb-6 tracking-tight">Shree Jagadamba Selection</p>
+        <button onclick="window.openLogin()" class="text-[11px] text-gray-400 uppercase tracking-[0.2em] font-bold border border-gray-100 px-10 py-4 rounded-full hover:bg-black hover:text-white transition-all shadow-sm">Owner Login</button>
     </footer>
 
-    <!-- LOGIN MODAL -->
-    <div id="loginModal" class="hidden fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl">
-            <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-[#fffaf0] text-[#b8860b] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#f3e5ab]">
-                    <i class="fas fa-user-lock text-2xl"></i>
-                </div>
-                <h2 class="brand-font text-xl font-bold uppercase tracking-wider text-center">Owner Access</h2>
-                <p class="text-[10px] text-gray-400 uppercase tracking-widest mt-1 text-center font-bold">Manage Catalogue</p>
-            </div>
-            <div class="space-y-4">
-                <input type="password" id="adminPassword" placeholder="Enter Password" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-center font-bold tracking-widest outline-none focus:border-[#b8860b]">
-                <div class="flex gap-2">
-                    <button onclick="closeAdminLogin()" class="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-gray-600 uppercase">Cancel</button>
-                    <button onclick="verifyAdmin()" class="flex-[2] py-4 bg-[#d4af37] text-white rounded-xl text-xs font-bold shadow-lg uppercase tracking-widest">Verify</button>
-                </div>
+    <!-- Modals -->
+    <div id="dModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-6 text-center z-[10001]">
+        <div class="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">
+            <h2 class="brand-font text-xl font-bold mb-4 uppercase text-gray-800">Hatao Item?</h2>
+            <div class="flex gap-4 mt-6">
+                <button onclick="window.closeDeleteModal()" class="flex-1 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest rounded-xl hover:bg-gray-50">Nahi</button>
+                <button id="confirmDeleteBtn" class="flex-1 py-4 bg-red-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg active:scale-95">Haan</button>
             </div>
         </div>
     </div>
 
+    <div id="lModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-6 text-center">
+        <div class="bg-white rounded-[3rem] p-12 max-w-sm w-full shadow-2xl relative">
+            <button onclick="window.closeLogin()" class="absolute top-6 right-8 text-gray-300 hover:text-gray-800"><i class="fas fa-times"></i></button>
+            <h2 class="brand-font text-2xl font-bold mb-8 uppercase text-gray-800 tracking-tight">Admin Access</h2>
+            <input type="password" id="pInput" placeholder="PIN Daalein" class="w-full p-5 bg-gray-50 border rounded-2xl text-center font-bold tracking-[0.6em] text-2xl outline-none mb-8 focus:ring-2 focus:ring-yellow-500">
+            <button onclick="window.verifyAdmin()" class="w-full py-5 bg-[#B8860B] text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl hover:bg-black transition-all">Unlock Store</button>
+        </div>
+    </div>
+
+    <div id="vModal" class="hidden fixed inset-0 modal-overlay flex flex-col items-center justify-center p-4 z-[9999]" onclick="window.closeFullImage()">
+        <img id="lImg" src="" class="rounded-3xl shadow-2xl mb-6 max-h-[85vh] w-auto object-contain border-4 border-white/10" onclick="event.stopPropagation()">
+        <p id="lName" class="text-white font-bold uppercase tracking-[0.2em] text-lg bg-black/30 px-6 py-2 rounded-full backdrop-blur-sm"></p>
+    </div>
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLlLFFbzRzB4oE-LT4QxbUmukO6SVRJ4I",
+            authDomain: "my-side-11eef.firebaseapp.com",
+            projectId: "my-side-11eef",
+            storageBucket: "my-side-11eef.firebasestorage.app",
+            messagingSenderId: "85450849605",
+            appId: "1:85450849605:web:870172cbece91b6960922c",
+            measurementId: "G-N2H0VT2XXJ"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'shree-jagadamba-v21';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        window.activeCat = 'All';
+        
+        // --- NEW: Load Liked Items from LocalStorage ---
+        window.likedItems = new Set(JSON.parse(localStorage.getItem('sjs_liked_items') || '[]'));
+
+        // toast helper
+        const showToast = (msg, isError = false) => {
+            const t = document.getElementById('toast');
+            if(!t) return;
+            t.innerText = msg;
+            t.style.backgroundColor = isError ? '#ef4444' : '#111827';
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 4000);
+        };
+
+        // --- NEW: Like and Share Functions ---
+
+        window.toggleLike = function(id, e) {
+            e.stopPropagation(); // Stop opening the image modal
+            
+            const btn = document.getElementById(`like-btn-${id}`);
+            const icon = btn.querySelector('i');
+            
+            if (window.likedItems.has(id)) {
+                // Unlike
+                window.likedItems.delete(id);
+                icon.className = 'far fa-heart text-gray-400';
+                showToast("Removed from Saved Items");
+                
+                // If we are currently viewing the Liked tab, refresh to remove it instantly
+                if(window.activeCat === 'Liked') {
+                    loadData();
+                }
+            } else {
+                // Like
+                window.likedItems.add(id);
+                icon.className = 'fas fa-heart text-red-500 animate-bounce';
+                showToast("Added to Saved Items ❤️");
+            }
+            
+            // Save to phone storage
+            localStorage.setItem('sjs_liked_items', JSON.stringify([...window.likedItems]));
+        };
+
+        window.shareItem = async function(name, price, imgUrl, e) {
+            e.stopPropagation();
+            
+            const shareData = {
+                title: 'Shree Jagadamba Selection',
+                text: `Check out this ${name} for ₹${price}!\nAvailable at Shree Jagadamba Selection, Anavatti.`,
+                url: window.location.href // Or specific product link if you had routing
+            };
+
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    // Fallback to clipboard
+                    await navigator.clipboard.writeText(`${shareData.text}\nImage: ${imgUrl}`);
+                    showToast("Link Copied to Clipboard! 📋");
+                }
+            } catch (err) {
+                console.log('Share canceled');
+            }
+        };
+
+        // Window exposed functions - Registered properly as global functions
+        window.openLogin = function() {
+            const modal = document.getElementById('lModal');
+            if(modal) modal.classList.remove('hidden');
+            setTimeout(() => {
+                const inp = document.getElementById('pInput');
+                if(inp) inp.focus();
+            }, 100);
+        };
+
+        window.closeLogin = function() {
+            const modal = document.getElementById('lModal');
+            if(modal) modal.classList.add('hidden');
+            const inp = document.getElementById('pInput');
+            if(inp) inp.value = '';
+        };
+
+        window.logoutManual = function() {
+            localStorage.removeItem('sjs_v21_active');
+            window.location.reload();
+        };
+
+        window.handleFileSelect = function(el) {
+            if(el.files && el.files.length) {
+                const tag = document.getElementById('lTag');
+                if(tag) tag.innerHTML = `<i class="fas fa-check-circle text-2xl text-green-500 mb-2"></i><span class="text-green-600 font-bold">Photo Ready ✅</span>`;
+            }
+        };
+
+        window.closeDeleteModal = function() {
+            const modal = document.getElementById('dModal');
+            if(modal) modal.classList.add('hidden');
+        };
+
+        window.openFullImage = function(url, name) {
+            const img = document.getElementById('lImg');
+            const nm = document.getElementById('lName');
+            const modal = document.getElementById('vModal');
+            if(img) img.src = url;
+            if(nm) nm.innerText = name;
+            if(modal) modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.closeFullImage = function() {
+            const modal = document.getElementById('vModal');
+            if(modal) modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        };
+
+        window.verifyAdmin = function() {
+            const inp = document.getElementById('pInput');
+            if(!inp) return;
+            const enteredPin = inp.value.trim().toLowerCase();
+            if (enteredPin === "sirvitarun9828") {
+                localStorage.setItem('sjs_v21_active', '1');
+                window.closeLogin();
+                document.body.classList.add('admin-active');
+                showToast("Namaste Owner! ✅");
+            } else {
+                showToast("Galt Pin Hai!", true);
+            }
+        };
+
+        window.filterCategory = function(cat, el) {
+            window.activeCat = cat;
+            document.querySelectorAll('nav a').forEach(a => {
+                a.classList.remove('nav-active');
+                a.classList.add('text-gray-400');
+                if(a.id === 'cat-Liked') a.classList.remove('text-red-500'); // reset red color
+            });
+            
+            el.classList.add('nav-active');
+            el.classList.remove('text-gray-400');
+            
+            // Keep red color for Liked tab active state
+            if(cat === 'Liked') {
+                el.classList.add('text-red-500');
+            }
+
+            loadData();
+        };
+
+        // Firebase Logic
+        const initAuth = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Auth error:", error);
+                const msg = document.getElementById('loadingMsg');
+                if(msg) msg.innerText = "Auth Lock. Check Firebase API Key Settings.";
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                const loader = document.getElementById('loadingStatus');
+                if(loader) loader.classList.add('hidden');
+                loadData();
+            }
+        });
+
+        initAuth();
+
+        function loadData() {
+            if (!currentUser) return;
+            const pRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+            
+            onSnapshot(pRef, (snap) => {
+                const grid = document.getElementById('pGrid');
+                if(!grid) return;
+                grid.innerHTML = '';
+                
+                let hasItems = false;
+                
+                snap.forEach((docSnap) => {
+                    const item = docSnap.data();
+                    const id = docSnap.id;
+                    
+                    // Filter Logic:
+                    // 1. Show if category matches OR activeCat is 'All'
+                    // 2. BUT if activeCat is 'Liked', only show if ID is in likedItems set
+                    
+                    let shouldShow = false;
+                    
+                    if (window.activeCat === 'Liked') {
+                        if (window.likedItems.has(id)) shouldShow = true;
+                    } else if (window.activeCat === 'All' || item.cat === window.activeCat) {
+                        shouldShow = true;
+                    }
+
+                    if (shouldShow) {
+                        hasItems = true;
+                        
+                        // Check if this specific item is liked to set the heart icon style
+                        const isLiked = window.likedItems.has(id);
+                        const heartClass = isLiked ? 'fas fa-heart text-red-500' : 'far fa-heart text-gray-400';
+                        
+                        const card = document.createElement('div');
+                        card.className = "product-card animate-fade-in";
+                        card.innerHTML = `
+                            <button class="delete-btn" data-id="${id}"><i class="fas fa-trash-alt text-sm"></i></button>
+                            
+                            <div class="aspect-[3/4] overflow-hidden bg-gray-50 relative">
+                                <img src="${item.img}" class="w-full h-full object-cover transition-all duration-700 hover:scale-110" onerror="this.src='https://via.placeholder.com/300x400?text=No+Image'">
+                                
+                                <!-- New Action Buttons overlay -->
+                                <div class="absolute bottom-3 right-3 flex flex-col gap-2 z-10">
+                                    <button onclick="window.toggleLike('${id}', event)" id="like-btn-${id}" class="action-btn hover:bg-red-50">
+                                        <i class="${heartClass} text-lg transition-all duration-300"></i>
+                                    </button>
+                                    <button onclick="window.shareItem('${item.n.replace(/'/g, "")}', '${item.p}', '${item.img}', event)" class="action-btn hover:bg-blue-50 text-blue-500">
+                                        <i class="fas fa-share-alt text-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 text-center">
+                                <h4 class="brand-font text-xs font-bold uppercase truncate text-gray-800">${item.n}</h4>
+                                <p class="text-lg font-black text-[#B8860B] mt-1 tracking-tight">₹${Number(item.p).toLocaleString()}</p>
+                            </div>`;
+                            
+                        card.onclick = () => window.openFullImage(item.img, item.n);
+                        
+                        const dBtn = card.querySelector('.delete-btn');
+                        if(dBtn) {
+                            dBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                window.deleteItem(id);
+                            };
+                        }
+                        grid.appendChild(card);
+                    }
+                });
+                
+                const nd = document.getElementById('noData');
+                const ndText = document.getElementById('noDataText');
+                
+                if(nd) {
+                    nd.classList.toggle('hidden', hasItems);
+                    if (window.activeCat === 'Liked' && !hasItems) {
+                        ndText.innerText = "No Saved Items Yet ❤️";
+                    } else {
+                        ndText.innerText = "Abhi Stock Khali Hai";
+                    }
+                }
+            });
+        }
+
+        window.addItem = async function() {
+            if (!currentUser) return showToast("Authenticating...", true);
+            const name = document.getElementById('itemName').value.trim();
+            const price = document.getElementById('itemPrice').value.trim();
+            const cat = document.getElementById('itemCat').value;
+            const fileInput = document.getElementById('imgInp');
+            
+            if (!name || !price || !fileInput.files[0]) return showToast("Puri jaankari bhariye!", true);
+            
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('upload_preset', 'ml_default'); 
+                const clRes = await fetch('https://api.cloudinary.com/v1_1/dkxmgxkgb/image/upload', { method: 'POST', body: formData });
+                const clData = await clRes.json();
+                
+                if (!clData.secure_url) throw new Error("Upload Error");
+
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), { 
+                    n: name, 
+                    p: price, 
+                    cat: cat, 
+                    img: clData.secure_url, 
+                    timestamp: serverTimestamp() 
+                });
+                
+                showToast("Dukaan Update Ho Gayi! ✅");
+                document.getElementById('itemName').value = '';
+                document.getElementById('itemPrice').value = '';
+                fileInput.value = '';
+                const tag = document.getElementById('lTag');
+                if(tag) tag.innerHTML = `<i class="fas fa-camera text-3xl mb-2 text-yellow-600"></i><span>Photo Chuno</span>`;
+            } catch (e) { 
+                console.error("Upload error:", e);
+                showToast("Upload Failed. Cloudinary preset 'Unsigned' hona chahiye.", true); 
+            } finally { 
+                btn.disabled = false;
+                btn.innerText = "Upload Karein"; 
+            }
+        };
+
+        window.deleteItem = function(id) {
+            const modal = document.getElementById('dModal');
+            if(modal) modal.classList.remove('hidden');
+            const btn = document.getElementById('confirmDeleteBtn');
+            if(btn) {
+                btn.onclick = async () => {
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                        showToast("Design Hata Diya Gaya! 🗑️");
+                        window.closeDeleteModal();
+                    } catch (e) {
+                        showToast("Error deleting", true);
+                    }
+                };
+            }
+        };
+
+        if (localStorage.getItem('sjs_v21_active') === '1') {
+            document.body.classList.add('admin-active');
+        }
+    </script>
 </body>
 </html>
